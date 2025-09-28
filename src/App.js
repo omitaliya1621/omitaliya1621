@@ -162,7 +162,7 @@ function App() {
       },
       rows: invoice.items.map((item, i) => ({
         sr: i + 1,
-        product: item.product,
+        product: item.product.toUpperCase(),
         pc: item.pc,
         rate: item.rate,
         amount: item.amount,
@@ -203,241 +203,190 @@ function App() {
   };
 
   // ---------- PDF Generation ----------
-  const generatePDF = () => {
-    if (!validateForm()) {
-      alert("Please fix all errors before generating PDF");
-      return;
-    }
+const generatePDF = () => {
+  if (!validateForm()) {
+    alert("Please fix all errors before generating PDF");
+    return;
+  }
 
-    setIsGenerating(true);
+  setIsGenerating(true);
 
-    try {
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 10;
+  try {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 10;
 
-      // ---------------- HEADER SECTION ----------------
-      // Page border
-      doc.setLineWidth(0.5);
-      doc.rect(margin, margin, pageWidth - 2 * margin, pageHeight - 2 * margin);
+    // ---------------- OUTER BORDER ----------------
+    doc.setLineWidth(0.5);
+    doc.rect(margin, margin, pageWidth - 2 * margin, pageHeight - 2 * margin);
 
-      // TAX INVOICE Title
-      doc.setFontSize(14).setFont("helvetica", "bold");
-      doc.text("TAX INVOICE", pageWidth / 2, 20, { align: "center" });
+    // ---------------- TAX INVOICE BOX ----------------
+    doc.setFontSize(12).setFont("helvetica", "bold");
+    const taxBoxWidth = 45;
+    const taxBoxHeight = 10;
+    doc.rect(pageWidth - margin - taxBoxWidth, margin, taxBoxWidth, taxBoxHeight);
+    doc.text("TAX INVOICE", pageWidth - margin - taxBoxWidth / 2, margin + 7, { align: "center" });
 
-      // Devotional text
-      doc.setFontSize(10).setFont("helvetica", "normal");
-      doc.text("!!** Shree Ganeshay Namah **!!", pageWidth / 2, 28, { align: "center" });
+    // ---------------- DEVOTIONAL TEXT ----------------
+    doc.setFontSize(10).setFont("helvetica", "normal");
+    doc.text("!! ** Shree Ganeshay Namah ** !!", pageWidth / 2, margin + 15, { align: "center" });
 
-      // Company Name
-      doc.setFontSize(20).setFont("helvetica", "bold");
-      doc.text("AENSI FASHION", pageWidth / 2, 40, { align: "center" });
+    // ---------------- COMPANY HEADER BOX ----------------
+    const headerBoxY = margin + 18;
+    doc.rect(margin, headerBoxY, pageWidth - 2 * margin, 35);
 
-      // Company Address
-      doc.setFont("helvetica", "normal").setFontSize(10);
-      doc.text(
-        "PLOT NO:: 16, THIRD FLOOR, SHIVAM INDUSTRIAL ESTATE, VARELI, SURAT",
-        pageWidth / 2,
-        50,
-        { align: "center" }
-      );
-      doc.text(
-        "GSTIN :: 24CNVPV0486P1ZT (Mo):9998446895",
-        pageWidth / 2,
-        58,
-        { align: "center" }
-      );
+    doc.setFontSize(16).setFont("helvetica", "bold");
+    doc.text("AENSI FASHION", pageWidth / 2, headerBoxY + 12, { align: "center" });
 
-      // ---------------- SEPARATORS ----------------
-      doc.setLineWidth(0.5);
-      doc.line(margin, 68, pageWidth - margin, 68); // Top separator
-      doc.line(margin, 78, pageWidth - margin, 78); // Billing section separator
+    doc.setFontSize(10).setFont("helvetica", "normal");
+    doc.text("PLOT NO :: 16, THIRD FLOOR, SHIVAM INDUSTRIAL ESTATE, VARELI ,SURAT.", pageWidth / 2, headerBoxY + 20, { align: "center" });
+    doc.text("GSTIN :: 24CNVP0486P1ZT", pageWidth / 2, headerBoxY + 28, { align: "center" });
+    doc.text("(Mo):9989446895", pageWidth / 2, headerBoxY + 36, { align: "center" });
 
-      // ---------------- BILLING INFO ----------------
-      const leftColumnX = margin + 5;
-      const rightColumnX = pageWidth / 2 + 5;
-      const billingStartY = 83;
+    // ---------------- BILLING INFO BOXES ----------------
+    const billingBoxY = headerBoxY + 35;
+    const billingBoxHeight = 50;
+    const halfWidth = (pageWidth - 2 * margin) / 2;
 
-      // Left Column - Billing Address
-      doc.setFont("helvetica", "bold").setFontSize(10);
-      doc.text("Billing Address:", leftColumnX, billingStartY);
+    // Left Billing Box
+    doc.rect(margin, billingBoxY, halfWidth, billingBoxHeight);
 
-      let billingY = billingStartY + 8;
-      const customerName = invoice.customerName || "Customer Name";
-      doc.text(customerName, leftColumnX, billingY);
-      billingY += 6;
+    // Right Invoice Details Box
+    doc.rect(margin + halfWidth, billingBoxY, halfWidth, billingBoxHeight);
 
-      // Address Lines
-      let addressLines = [];
-      if (invoice.address) {
-        const lines = invoice.address
-          .split("\n")
-          .map(line => line.trim())
-          .filter(Boolean);
+    // Left - Billing Address
+    doc.setFont("helvetica", "bold").setFontSize(10);
+    doc.text("Billing Address:", margin + 5, billingBoxY + 8);
 
-        addressLines = lines[0] === invoice.customerName ? lines.slice(1) : lines;
-      } else {
-        addressLines = [
-          "PLOT NO: 45 TO 48 VIDHATA IND.",
-          "PART:02, 3RD FLOOR, HARIPURA GAM",
-          "KADODARA ROAD, SURAT",
-        ];
-      }
+    doc.text(invoice.customerName?.toUpperCase() || "MANGALAM CREATION", margin + 5, billingBoxY + 16);
+    doc.setFont("helvetica", "normal");
+    doc.text("PLOT NO : 45 TO 48 VIDHATA IND.", margin + 5, billingBoxY + 24);
+    doc.text("PART:02 ,3RD FLOOR , HARIPURA GAM", margin + 5, billingBoxY + 30);
+    doc.text("KADODARA ROAD , SURAT", margin + 5, billingBoxY + 36);
+    doc.text("State : (24) GUJARAT", margin + 5, billingBoxY + 44);
+    doc.text("GSTIN : 24AGUPB3548G1ZD", margin + 5, billingBoxY + 50);
 
-      const maxWidth = pageWidth / 2 - 20;
-      addressLines.forEach(line => {
-        const wrapped = doc.splitTextToSize(line, maxWidth);
-        wrapped.forEach(wrap => {
-          doc.text(wrap, leftColumnX, billingY);
-          billingY += 5;
-        });
-      });
+    // Right - Invoice Info
+    let rightX = margin + halfWidth + 5;
+    doc.setFont("helvetica", "normal").setFontSize(10);
+    doc.text("Invoice Date :", rightX, billingBoxY + 12);
+    doc.text("Challan No. :", rightX, billingBoxY + 20);
+    doc.text("BILL NO     :", rightX, billingBoxY + 28);
 
-      // State & GSTIN
-      doc.text(`State : (24) ${invoice.state}`, leftColumnX, billingY);
-      billingY += 5;
-      doc.text(`GSTIN : ${invoice.gstin || "GSTIN"}`, leftColumnX, billingY);
-      billingY += 5;
+    doc.setFont("helvetica", "bold");
+    doc.text(invoice.invoiceDate || "01-09-2025", rightX + 30, billingBoxY + 12);
+    doc.text(invoice.challanNo || "08", rightX + 30, billingBoxY + 20);
+    doc.text(invoice.billNo || "10", rightX + 30, billingBoxY + 28);
 
-      // Right Column - Invoice Details
-      doc.setFont("helvetica", "normal").setFontSize(10);
-      doc.text(`Invoice Date: ${invoice.invoiceDate}`, rightColumnX, billingStartY);
-      doc.text(`Challan No  : ${invoice.challanNo}`, rightColumnX, billingStartY + 6);
-      doc.text(`BILL NO     : ${invoice.billNo}`, rightColumnX, billingStartY + 12);
+    // ---------------- ITEM TABLE ----------------
+    const tableStartY = billingBoxY + billingBoxHeight + 5;
+    autoTable(doc, {
+      startY: tableStartY,
+      head: [createTableData().headers],
+      body: createTableData().rows.map(row => [
+        row.sr,
+        row.product,
+        row.pc,
+        row.rate,
+        row.amount,
+        `${row.cgst.rate} | ${row.cgst.amount}`,
+        `${row.sgst.rate} | ${row.sgst.amount}`,
+      ]),
+      styles: {
+        fontSize: 10,
+        lineColor: [0, 0, 0],
+        lineWidth: 0.3,
+        cellPadding: 3,
+        halign: "center",
+        valign: "middle",
+      },
+      headStyles: {
+        fillColor: [240, 240, 240],
+        textColor: [0, 0, 0],
+        fontStyle: "bold",
+        halign: "center",
+        valign: "middle",
+      },
+      columnStyles: {
+        0: { halign: "center", cellWidth: 12 },
+        1: { halign: "left", cellWidth: 35 },
+        2: { halign: "center", cellWidth: 15 },
+        3: { halign: "center", cellWidth: 18 },
+        4: { halign: "center", cellWidth: 22 },
+        5: { halign: "center", cellWidth: 30 },
+        6: { halign: "center", cellWidth: 30 },
+      },
+      theme: "grid",
+      margin: { left: margin, right: margin },
+    });
 
-      // Vertical Divider Line
-      const lineX = pageWidth / 2;
-      const lineStartY = 78;
-      const lineEndY = billingY + 3;
-      doc.line(lineX, lineStartY, lineX, lineEndY);
+    // ---------------- TOTALS SECTION ----------------
+    const totalsData = createTotalsData();
+    const totalsTableStartY = doc.lastAutoTable.finalY + 5;
+    const fullTableWidth = pageWidth - 2 * margin;
 
-      // Horizontal line before Table
-      const tableStartY = lineEndY;
-      doc.line(margin, tableStartY, pageWidth - margin, tableStartY);
+    autoTable(doc, {
+      startY: totalsTableStartY,
+      head: [["", ""]],
+      body: [
+        [totalsData.paymentTerms, ``],
+        [`Sub Total :`, totalsData.subTotal],
+        [`-LESS DISCOUNT :-${totalsData.discount.percentage}`, totalsData.discount.amount],
+        [`+ SGST 2.5%`, totalsData.sgst],
+        [`+ CGST 2.5%`, totalsData.cgst],
+        [`Net Amount :`, totalsData.netAmount],
+      ],
+      styles: {
+        fontSize: 10,
+        lineColor: [0, 0, 0],
+        lineWidth: 0.3,
+        cellPadding: 3,
+        halign: "left",
+        valign: "middle",
+      },
+      columnStyles: {
+        0: { halign: "left", cellWidth: fullTableWidth * 0.7, fontStyle: "bold" },
+        1: { halign: "right", cellWidth: fullTableWidth * 0.3, fontStyle: "bold" },
+      },
+      theme: "grid",
+      showHead: false,
+      margin: { left: margin, right: margin },
+      tableWidth: fullTableWidth,
+      didDrawCell: data => {
+        if (data.row.index === 0) {
+          doc.setFontSize(10).setFont("helvetica", "normal");
+        } else if (data.row.index === 4) {
+          doc.setLineWidth(0.5);
+          doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+        } else if (data.row.index === 5) {
+          doc.setFontSize(12).setFont("helvetica", "bold");
+        } else {
+          doc.setFontSize(10).setFont("helvetica", "bold");
+        }
+      },
+    });
 
-      // ---------------- ITEM TABLE ----------------
-      autoTable(doc, {
-        startY: tableStartY + 5,
-        head: [createTableData().headers],
-        body: createTableData().rows.map(row => [
-          row.sr,
-          row.product,
-          row.pc,
-          row.rate,
-          row.amount,
-          `${row.cgst.rate} | ${row.cgst.amount}`,
-          `${row.sgst.rate} | ${row.sgst.amount}`,
-        ]),
-        styles: {
-          fontSize: 10,
-          lineColor: [0, 0, 0],
-          lineWidth: 0.3,
-          cellPadding: 3,
-          halign: "center",
-          valign: "middle",
-        },
-        headStyles: {
-          fillColor: [240, 240, 240],
-          textColor: [0, 0, 0],
-          fontStyle: "bold",
-          halign: "center",
-          valign: "middle",
-        },
-        columnStyles: {
-          0: { halign: "center", cellWidth: 12 },
-          1: { halign: "left", cellWidth: 35 },
-          2: { halign: "center", cellWidth: 15 },
-          3: { halign: "center", cellWidth: 18 },
-          4: { halign: "center", cellWidth: 22 },
-          5: { halign: "center", cellWidth: 30 },
-          6: { halign: "center", cellWidth: 30 },
-        },
-        theme: "grid",
-        margin: { left: margin, right: margin },
-      });
+    // ---------------- FOOTER ----------------
+    const footerY = pageHeight - 30;
+    doc.setFont("helvetica", "normal").setFontSize(10);
+    doc.text("For AENSI FASHION", margin + 5, footerY);
+    doc.text("Authorised Signatory", pageWidth - 50, footerY);
 
-      // Add Sub-Headers for CGST/SGST
-      const tableEndY = doc.lastAutoTable.finalY;
-      const tableStartX = margin;
-      const cgstStartX = tableStartX + 12 + 35 + 15 + 18 + 22;
-      const utsgstStartX = cgstStartX + 30;
+    doc.setLineWidth(0.3);
+    doc.line(margin, footerY - 8, pageWidth - margin, footerY - 8);
 
-      doc.setLineWidth(0.3);
-      doc.line(cgstStartX + 15, tableStartY + 5, cgstStartX + 15, tableEndY);
-      doc.line(utsgstStartX + 15, tableStartY + 5, utsgstStartX + 15, tableEndY);
+    // Save PDF
+    doc.save("invoice.pdf");
 
-      doc.setFontSize(8).setFont("helvetica", "bold");
-      doc.text("Rate", cgstStartX + 7, tableStartY + 2, { align: "center" });
-      doc.text("Amt.", cgstStartX + 22, tableStartY + 2, { align: "center" });
-      doc.text("Rate", utsgstStartX + 7, tableStartY + 2, { align: "center" });
-      doc.text("Amt.", utsgstStartX + 22, tableStartY + 2, { align: "center" });
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    alert("Error generating PDF. Please try again.");
+  } finally {
+    setIsGenerating(false);
+  }
+};
 
-      // ---------------- TOTALS SECTION ----------------
-      const totalsData = createTotalsData();
-      const totalsTableStartY = doc.lastAutoTable.finalY + 10;
-      const fullTableWidth = pageWidth - 2 * margin;
-
-      autoTable(doc, {
-        startY: totalsTableStartY,
-        head: [["", ""]],
-        body: [
-          [totalsData.paymentTerms, ``],
-          [`Sub Total :`, totalsData.subTotal],
-          [`-LESS DISCOUNT :-${totalsData.discount.percentage}`, totalsData.discount.amount],
-          [`+ SGST 2.5%`, totalsData.sgst],
-          [`+ CGST 2.5%`, totalsData.cgst],
-          [`Net Amount :`, totalsData.netAmount],
-        ],
-        styles: {
-          fontSize: 10,
-          lineColor: [0, 0, 0],
-          lineWidth: 0.3,
-          cellPadding: 3,
-          halign: "left",
-          valign: "middle",
-        },
-        columnStyles: {
-          0: { halign: "left", cellWidth: fullTableWidth * 0.7, fontStyle: "bold" },
-          1: { halign: "right", cellWidth: fullTableWidth * 0.3, fontStyle: "bold" },
-        },
-        theme: "grid",
-        showHead: false,
-        margin: { left: margin, right: margin },
-        tableWidth: fullTableWidth,
-        didDrawCell: data => {
-          if (data.row.index === 0) {
-            doc.setFontSize(10).setFont("helvetica", "normal");
-          } else if (data.row.index === 4) {
-            doc.setLineWidth(0.5);
-            doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
-          } else if (data.row.index === 5) {
-            doc.setFontSize(12).setFont("helvetica", "bold");
-          } else {
-            doc.setFontSize(10).setFont("helvetica", "bold");
-          }
-        },
-      });
-
-      // ---------------- FOOTER ----------------
-      const footerY = pageHeight - 30;
-      doc.setFont("helvetica", "normal").setFontSize(10);
-      doc.text("For AENSI FASHION", margin + 5, footerY);
-      doc.text("Authorised Signatory", pageWidth - 50, footerY);
-
-      doc.setLineWidth(0.3);
-      doc.line(margin, footerY - 8, pageWidth - margin, footerY - 8);
-
-      // Save PDF
-      doc.save("invoice.pdf");
-
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      alert("Error generating PDF. Please try again.");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
 
   const totals = calculateTotals();
