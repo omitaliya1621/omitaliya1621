@@ -213,6 +213,18 @@ textarea.form-input {
   transform: translateY(-1px);
 }
 
+.generate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.generate-btn:disabled:hover {
+  transform: none;
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+}
+
+
 .summary-section {
   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
   padding: 20px;

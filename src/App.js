@@ -1,8 +1,7 @@
 import './App.css';
 // import ganpati from "./ganpati-bapa.jpg";
 import React, { useState, useEffect } from "react";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import html2pdf from "html2pdf.js";
 
 function App() {
   const [invoice, setInvoice] = useState({
@@ -21,20 +20,21 @@ function App() {
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Auto-generate invoice number
-  useEffect(() => {
-    if (!invoice.billNo) {
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const day = String(today.getDate()).padStart(2, '0');
-      const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-      setInvoice(prev => ({
-        ...prev,
-        billNo: `INV-${year}${month}${day}-${randomNum}`
-      }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 👈 run only once
+ useEffect(() => {
+  if (!invoice.billNo) {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    setInvoice(prev => ({
+      ...prev,
+      billNo: `INV-${year}${month}${day}-${randomNum}`
+    }));
+  }
+}, [invoice.billNo]);
+
+
 
 
   // Auto-calculate amount when rate or pc changes
@@ -152,58 +152,9 @@ function App() {
     };
   };
 
-  // Create table data structure
-  const createTableData = () => {
-    const tableData = {
-      headers: ["Sr", "Name of Product", "PC", "Rate", "Amount", "CGST", "UT/SGST"],
-      subHeaders: {
-        CGST: ["Rate", "Amt."],
-        UT_SGST: ["Rate", "Amt."]
-      },
-      rows: invoice.items.map((item, i) => ({
-        sr: i + 1,
-        product: item.product.toUpperCase(),
-        pc: item.pc,
-        rate: item.rate,
-        amount: item.amount,
-        cgst: {
-          rate: `${item.cgst}%`,
-          amount: (item.amount * item.cgst / 100).toFixed(0)
-        },
-        sgst: {
-          rate: `${item.sgst}%`,
-          amount: (item.amount * item.sgst / 100).toFixed(0)
-        }
-      }))
-    };
-    return tableData;
-  };
 
-  // Create totals data structure
-  const createTotalsData = () => {
-    const subTotal = invoice.items.reduce((sum, it) => sum + Number(it.amount || 0), 0);
-    const discountPercentage = Number(invoice.discount || 0);
-    const discountAmount = (subTotal * discountPercentage) / 100;
-    const taxableAmount = subTotal - discountAmount;
-    const cgst = (taxableAmount * 2.5) / 100;
-    const sgst = (taxableAmount * 2.5) / 100;
-    const net = taxableAmount + cgst + sgst;
-
-    return {
-      paymentTerms: "Payment within 45 days",
-      subTotal: subTotal.toFixed(0),
-      discount: {
-        percentage: discountPercentage,
-        amount: discountAmount.toFixed(0)
-      },
-      sgst: sgst.toFixed(0),
-      cgst: cgst.toFixed(0),
-      netAmount: net.toFixed(0)
-    };
-  };
-
-  // ---------- PDF Generation ----------
-const generatePDF = () => {
+  // ---------- HTML to PDF Generation ----------
+const generateHTMLToPDF = () => {
   if (!validateForm()) {
     alert("Please fix all errors before generating PDF");
     return;
@@ -211,181 +162,145 @@ const generatePDF = () => {
 
   setIsGenerating(true);
 
-  try {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 10;
+  // 1. Create visible temporary div
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML =createSimpleInvoiceHTML();
+  
+  // Append to DOM in visible area
+  tempDiv.style.position = 'relative';
+  tempDiv.style.backgroundColor = 'white';
+  tempDiv.style.padding = '20px';
+  // tempDiv.style.width = '800px';
+  document.body.appendChild(tempDiv);
 
-    // ---------------- OUTER BORDER ----------------
-    doc.setLineWidth(0.5);
-    doc.rect(margin, margin, pageWidth - 2 * margin, pageHeight - 2 * margin);
+  // 2. Configure html2pdf
+  const opt = {
+    margin: 0.5,
+    filename: `Invoice_${invoice.billNo}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+  };
 
-    // ---------------- TAX INVOICE BOX ----------------
-    doc.setFontSize(12).setFont("helvetica", "bold");
-    const taxBoxWidth = 45;
-    const taxBoxHeight = 10;
-    doc.rect(pageWidth - margin - taxBoxWidth, margin, taxBoxWidth, taxBoxHeight);
-    doc.text("TAX INVOICE", pageWidth - margin - taxBoxWidth / 2, margin + 7, { align: "center" });
-
-    // ---------------- DEVOTIONAL TEXT ----------------
-    doc.setFontSize(10).setFont("helvetica", "normal");
-    doc.text("!! ** Shree Ganeshay Namah ** !!", pageWidth / 2, margin + 15, { align: "center" });
-
-    // ---------------- COMPANY HEADER BOX ----------------
-    const headerBoxY = margin + 18;
-    doc.rect(margin, headerBoxY, pageWidth - 2 * margin, 35);
-
-    doc.setFontSize(16).setFont("helvetica", "bold");
-    doc.text("AENSI FASHION", pageWidth / 2, headerBoxY + 12, { align: "center" });
-
-    doc.setFontSize(10).setFont("helvetica", "normal");
-    doc.text("PLOT NO :: 16, THIRD FLOOR, SHIVAM INDUSTRIAL ESTATE, VARELI ,SURAT.", pageWidth / 2, headerBoxY + 20, { align: "center" });
-    doc.text("GSTIN :: 24CNVP0486P1ZT", pageWidth / 2, headerBoxY + 28, { align: "center" });
-    doc.text("(Mo):9989446895", pageWidth / 2, headerBoxY + 36, { align: "center" });
-
-    // ---------------- BILLING INFO BOXES ----------------
-    const billingBoxY = headerBoxY + 35;
-    const billingBoxHeight = 50;
-    const halfWidth = (pageWidth - 2 * margin) / 2;
-
-    // Left Billing Box
-    doc.rect(margin, billingBoxY, halfWidth, billingBoxHeight);
-
-    // Right Invoice Details Box
-    doc.rect(margin + halfWidth, billingBoxY, halfWidth, billingBoxHeight);
-
-    // Left - Billing Address
-    doc.setFont("helvetica", "bold").setFontSize(10);
-    doc.text("Billing Address:", margin + 5, billingBoxY + 8);
-
-    doc.text(invoice.customerName?.toUpperCase() || "MANGALAM CREATION", margin + 5, billingBoxY + 16);
-    doc.setFont("helvetica", "normal");
-    doc.text("PLOT NO : 45 TO 48 VIDHATA IND.", margin + 5, billingBoxY + 24);
-    doc.text("PART:02 ,3RD FLOOR , HARIPURA GAM", margin + 5, billingBoxY + 30);
-    doc.text("KADODARA ROAD , SURAT", margin + 5, billingBoxY + 36);
-    doc.text("State : (24) GUJARAT", margin + 5, billingBoxY + 44);
-    doc.text("GSTIN : 24AGUPB3548G1ZD", margin + 5, billingBoxY + 50);
-
-    // Right - Invoice Info
-    let rightX = margin + halfWidth + 5;
-    doc.setFont("helvetica", "normal").setFontSize(10);
-    doc.text("Invoice Date :", rightX, billingBoxY + 12);
-    doc.text("Challan No. :", rightX, billingBoxY + 20);
-    doc.text("BILL NO     :", rightX, billingBoxY + 28);
-
-    doc.setFont("helvetica", "bold");
-    doc.text(invoice.invoiceDate || "01-09-2025", rightX + 30, billingBoxY + 12);
-    doc.text(invoice.challanNo || "08", rightX + 30, billingBoxY + 20);
-    doc.text(invoice.billNo || "10", rightX + 30, billingBoxY + 28);
-
-    // ---------------- ITEM TABLE ----------------
-    const tableStartY = billingBoxY + billingBoxHeight + 5;
-    autoTable(doc, {
-      startY: tableStartY,
-      head: [createTableData().headers],
-      body: createTableData().rows.map(row => [
-        row.sr,
-        row.product,
-        row.pc,
-        row.rate,
-        row.amount,
-        `${row.cgst.rate} | ${row.cgst.amount}`,
-        `${row.sgst.rate} | ${row.sgst.amount}`,
-      ]),
-      styles: {
-        fontSize: 10,
-        lineColor: [0, 0, 0],
-        lineWidth: 0.3,
-        cellPadding: 3,
-        halign: "center",
-        valign: "middle",
-      },
-      headStyles: {
-        fillColor: [240, 240, 240],
-        textColor: [0, 0, 0],
-        fontStyle: "bold",
-        halign: "center",
-        valign: "middle",
-      },
-      columnStyles: {
-        0: { halign: "center", cellWidth: 12 },
-        1: { halign: "left", cellWidth: 35 },
-        2: { halign: "center", cellWidth: 15 },
-        3: { halign: "center", cellWidth: 18 },
-        4: { halign: "center", cellWidth: 22 },
-        5: { halign: "center", cellWidth: 30 },
-        6: { halign: "center", cellWidth: 30 },
-      },
-      theme: "grid",
-      margin: { left: margin, right: margin },
-    });
-
-    // ---------------- TOTALS SECTION ----------------
-    const totalsData = createTotalsData();
-    const totalsTableStartY = doc.lastAutoTable.finalY + 5;
-    const fullTableWidth = pageWidth - 2 * margin;
-
-    autoTable(doc, {
-      startY: totalsTableStartY,
-      head: [["", ""]],
-      body: [
-        [totalsData.paymentTerms, ``],
-        [`Sub Total :`, totalsData.subTotal],
-        [`-LESS DISCOUNT :-${totalsData.discount.percentage}`, totalsData.discount.amount],
-        [`+ SGST 2.5%`, totalsData.sgst],
-        [`+ CGST 2.5%`, totalsData.cgst],
-        [`Net Amount :`, totalsData.netAmount],
-      ],
-      styles: {
-        fontSize: 10,
-        lineColor: [0, 0, 0],
-        lineWidth: 0.3,
-        cellPadding: 3,
-        halign: "left",
-        valign: "middle",
-      },
-      columnStyles: {
-        0: { halign: "left", cellWidth: fullTableWidth * 0.7, fontStyle: "bold" },
-        1: { halign: "right", cellWidth: fullTableWidth * 0.3, fontStyle: "bold" },
-      },
-      theme: "grid",
-      showHead: false,
-      margin: { left: margin, right: margin },
-      tableWidth: fullTableWidth,
-      didDrawCell: data => {
-        if (data.row.index === 0) {
-          doc.setFontSize(10).setFont("helvetica", "normal");
-        } else if (data.row.index === 4) {
-          doc.setLineWidth(0.5);
-          doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
-        } else if (data.row.index === 5) {
-          doc.setFontSize(12).setFont("helvetica", "bold");
-        } else {
-          doc.setFontSize(10).setFont("helvetica", "bold");
-        }
-      },
-    });
-
-    // ---------------- FOOTER ----------------
-    const footerY = pageHeight - 30;
-    doc.setFont("helvetica", "normal").setFontSize(10);
-    doc.text("For AENSI FASHION", margin + 5, footerY);
-    doc.text("Authorised Signatory", pageWidth - 50, footerY);
-
-    doc.setLineWidth(0.3);
-    doc.line(margin, footerY - 8, pageWidth - margin, footerY - 8);
-
-    // Save PDF
-    doc.save("invoice.pdf");
-
-  } catch (error) {
-    console.error("Error generating PDF:", error);
-    alert("Error generating PDF. Please try again.");
-  } finally {
+  // 3. Generate PDF
+  html2pdf().set(opt).from(tempDiv).save().finally(() => {
+    // 4. Cleanup
+    document.body.removeChild(tempDiv);
     setIsGenerating(false);
-  }
+  });
 };
+
+  // Create simplified HTML template for invoice
+  const createSimpleInvoiceHTML = () => {
+    const totals = calculateTotals();
+    
+    return (`
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; border: 2px solid #000; background: white; color: black;">
+        <!-- Header -->
+        <div style="text-align: center; margin-bottom: 20px;">
+          <div style="border: 1px solid #000; padding: 10px; display: inline-block; margin-bottom: 10px;">
+            <h2 style="margin: 0; font-size: 18px;">TAX INVOICE</h2>
+          </div>
+          <p style="margin: 5px 0; font-size: 12px;">!! ** Shree Ganeshay Namah ** !!</p>
+        </div>
+
+        <!-- Company Info -->
+        <div style="border: 1px solid #000; padding: 15px; margin-bottom: 20px; text-align: center;">
+          <h1 style="margin: 0 0 10px 0; font-size: 20px; font-weight: bold;">AENSI FASHION</h1>
+          <p style="margin: 5px 0; font-size: 11px;">PLOT NO :: 16, THIRD FLOOR, SHIVAM INDUSTRIAL ESTATE, VARELI ,SURAT.</p>
+          <p style="margin: 5px 0; font-size: 11px;">GSTIN :: 24CNVP0486P1ZT</p>
+          <p style="margin: 5px 0; font-size: 11px;">(Mo):9989446895</p>
+        </div>
+
+        <!-- Billing Info -->
+        <table style="width: 100%; margin-bottom: 20px; border-collapse: collapse;">
+          <tr>
+            <td style="width: 50%; border: 1px solid #000; padding: 10px; vertical-align: top;">
+              <h3 style="margin: 0 0 10px 0; font-size: 12px; font-weight: bold;">Billing Address:</h3>
+              <p style="margin: 2px 0; font-size: 11px; font-weight: bold;">${invoice.customerName?.toUpperCase() || "MANGALAM CREATION"}</p>
+              <p style="margin: 2px 0; font-size: 11px;">PLOT NO : 45 TO 48 VIDHATA IND.</p>
+              <p style="margin: 2px 0; font-size: 11px;">PART:02 ,3RD FLOOR , HARIPURA GAM</p>
+              <p style="margin: 2px 0; font-size: 11px;">KADODARA ROAD , SURAT</p>
+              <p style="margin: 2px 0; font-size: 11px;">State : (24) GUJARAT</p>
+              <p style="margin: 2px 0; font-size: 11px;">GSTIN : 24AGUPB3548G1ZD</p>
+            </td>
+            <td style="width: 50%; border: 1px solid #000; padding: 10px; vertical-align: top;">
+              <p style="margin: 5px 0; font-size: 11px;">Invoice Date : <strong>${invoice.invoiceDate || "01-09-2025"}</strong></p>
+              <p style="margin: 5px 0; font-size: 11px;">Challan No. : <strong>${invoice.challanNo || "08"}</strong></p>
+              <p style="margin: 5px 0; font-size: 11px;">BILL NO     : <strong>${invoice.billNo || "10"}</strong></p>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Items Table -->
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px;">
+          <thead>
+            <tr style="background-color: #f0f0f0;">
+              <th style="border: 1px solid #000; padding: 8px; text-align: center;">Sr</th>
+              <th style="border: 1px solid #000; padding: 8px; text-align: center;">Name of Product</th>
+              <th style="border: 1px solid #000; padding: 8px; text-align: center;">PC</th>
+              <th style="border: 1px solid #000; padding: 8px; text-align: center;">Rate</th>
+              <th style="border: 1px solid #000; padding: 8px; text-align: center;">Amount</th>
+              <th style="border: 1px solid #000; padding: 8px; text-align: center;">CGST</th>
+              <th style="border: 1px solid #000; padding: 8px; text-align: center;">UT/SGST</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${invoice.items.map((item, i) => `
+              <tr>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${i + 1}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: left;">${item.product.toUpperCase()}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${item.pc}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${item.rate}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${item.amount}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${item.cgst}% | ${(item.amount * item.cgst / 100).toFixed(0)}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${item.sgst}% | ${(item.amount * item.sgst / 100).toFixed(0)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <!-- Totals -->
+        <div style="margin-bottom: 20px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+            <tr>
+              <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">Payment within 45 days</td>
+              <td style="border: 1px solid #000; padding: 6px;"></td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">Sub Total :</td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">₹${totals.subTotal}</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">-LESS DISCOUNT :-${invoice.discount}%</td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">₹${totals.discount}</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">+ SGST 2.5%</td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">₹${totals.sgst}</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">+ CGST 2.5%</td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">₹${totals.cgst}</td>
+            </tr>
+            <tr style="border-top: 2px solid #000;">
+              <td style="border: 1px solid #000; padding: 8px; font-weight: bold; font-size: 13px;">Net Amount :</td>
+              <td style="border: 1px solid #000; padding: 8px; text-align: right; font-weight: bold; font-size: 13px;">₹${totals.net}</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Footer -->
+        <table style="width: 100%; margin-top: 30px; font-size: 11px;">
+          <tr>
+            <td style="width: 50%;">For AENSI FASHION</td>
+            <td style="width: 50%; text-align: right;">Authorised Signatory</td>
+          </tr>
+        </table>
+      </div>
+    `);
+  };
+
 
 
 
@@ -627,7 +542,7 @@ const generatePDF = () => {
       {/* Generate Button */}
       <button
         className="generate-btn"
-        onClick={generatePDF}
+        onClick={generateHTMLToPDF}
         disabled={isGenerating}
       >
         {isGenerating ? '⏳ Generating PDF...' : '📄 Generate & Download Invoice'}
